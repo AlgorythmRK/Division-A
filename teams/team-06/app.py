@@ -313,32 +313,34 @@ def get_comic_prompt(headline: str) -> str:
     return f"""Create a 4-panel comic from this news headline.
 IMPORTANT RULES FOR IMAGE PROMPTS:
 - Style must be "cartoon illustration, newspaper editorial style"
-- Characters must be NORMAL PEOPLE in realistic clothing (lab coats, suits, sports uniforms)
+- First, define ONE main character profile (e.g., "Raj, 25yo, wearing a red and black sports jersey, short hair").
+- YOU MUST COPY THIS EXACT CHARACTER DESCRIPTION INTO EVERY 'stable_diffusion_image_prompt'.
 - NEVER include superheroes, capes, masks, or action-hero imagery
 - Describe the actual scene setting, clothing, and environment in detail
 
 OUTPUT MUST BE VALID JSON WITH EXACTLY THIS STRUCTURE (NO OTHER TEXT):
 {{
+  "main_character_profile": "Detailed physical description and clothing of the main character",
   "panels": [
     {{
       "dialogue": "Short character speech (max 12 words)",
       "scene_description": "Visual setting with realistic characters (max 18 words)",
-      "stable_diffusion_image_prompt": "Cartoon illustration, newspaper editorial style, [describe realistic scene with normal people], soft colors, clean lines, panel 1 of 4"
+      "stable_diffusion_image_prompt": "Cartoon illustration, newspaper editorial style, [INSERT MAIN CHARACTER PROFILE HERE], [describe scene], soft colors, panel 1 of 4"
     }},
     {{
       "dialogue": "Short character speech (max 12 words)",
       "scene_description": "Visual setting with realistic characters (max 18 words)",
-      "stable_diffusion_image_prompt": "Cartoon illustration, newspaper editorial style, [describe realistic scene with normal people], soft colors, clean lines, panel 2 of 4"
+      "stable_diffusion_image_prompt": "Cartoon illustration, newspaper editorial style, [INSERT MAIN CHARACTER PROFILE HERE], [describe scene], soft colors, panel 2 of 4"
     }},
     {{
       "dialogue": "Short character speech (max 12 words)",
       "scene_description": "Visual setting with realistic characters (max 18 words)",
-      "stable_diffusion_image_prompt": "Cartoon illustration, newspaper editorial style, [describe realistic scene with normal people], soft colors, clean lines, panel 3 of 4"
+      "stable_diffusion_image_prompt": "Cartoon illustration, newspaper editorial style, [INSERT MAIN CHARACTER PROFILE HERE], [describe scene], soft colors, panel 3 of 4"
     }},
     {{
       "dialogue": "Short character speech (max 12 words)",
       "scene_description": "Visual setting with realistic characters (max 18 words)",
-      "stable_diffusion_image_prompt": "Cartoon illustration, newspaper editorial style, [describe realistic scene with normal people], soft colors, clean lines, panel 4 of 4"
+      "stable_diffusion_image_prompt": "Cartoon illustration, newspaper editorial style, [INSERT MAIN CHARACTER PROFILE HERE], [describe scene], soft colors, panel 4 of 4"
     }}
   ]
 }}
@@ -563,23 +565,36 @@ def main() -> None:
             key="category_select",
         )
 
-        filtered = df[df["category"] == selected_category]["headline"].tolist()
-
-        if not filtered:
-            st.warning(f"No headlines found for **{selected_category}**.")
-            with st.expander("ℹ️ Setup Instructions", expanded=True):
-                st.markdown(
-                    "Ensure `news_sample.csv` has rows with this category.\n\n"
-                    "Required columns: `category`, `headline`"
-                )
-            st.stop()
-
-        selected_headline = st.selectbox(
-            "Headline",
-            options=filtered,
-            index=0,
-            key="headline_select",
+        input_method = st.radio(
+            "Headline Source",
+            options=["Select from Dataset", "Write Custom Headline"],
+            key="input_method"
         )
+
+        if input_method == "Select from Dataset":
+            filtered = df[df["category"] == selected_category]["headline"].tolist()
+
+            if not filtered:
+                st.warning(f"No headlines found for **{selected_category}**.")
+                with st.expander("ℹ️ Setup Instructions", expanded=True):
+                    st.markdown(
+                        "Ensure `news_sample.csv` has rows with this category.\n\n"
+                        "Required columns: `category`, `headline`"
+                    )
+                st.stop()
+
+            selected_headline = st.selectbox(
+                "Headline",
+                options=filtered,
+                index=0,
+                key="headline_select",
+            )
+        else:
+            selected_headline = st.text_area(
+                "Custom Headline",
+                placeholder="e.g., Local hackathon team wins 1st place with GenAI comic app!",
+                key="custom_headline"
+            )
 
         st.markdown("---")
         generate_btn = st.button(
@@ -601,6 +616,10 @@ def main() -> None:
 
     # ── Generation ──────────────────────────────────────────────────────────
     if generate_btn:
+        if not selected_headline or not selected_headline.strip():
+            st.error("❌ Please enter a headline to generate a comic.")
+            st.stop()
+            
         fun_fact = random.choice(FUN_FACTS)
         with st.spinner(f"Creating your comic…  \n*{fun_fact}*"):
             # Step 1 — Script
